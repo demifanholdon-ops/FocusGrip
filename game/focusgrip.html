@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FocusGrip — Klifur-style ADHD Climbing</title>
+<style>
+  :root{
+    --tan:#E3D0B0;
+    --tan-dark:#D8C4A2;
+    --panel:#8C7358;
+    --panel-2:#7E6650;
+    --panel-shadow:#6E5946;
+    --ink:#5E4B3A;
+    --ink-soft:#7A6852;
+    --cream:#EFE6CF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#1c1712;overflow:hidden;
+    font-family:'Arial Black','Arial',sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+
+  /* ---------- MENU ---------- */
+  #menu{position:absolute;inset:0;background:#EAE1CB;
+    display:flex;flex-direction:column;align-items:center;
+    padding:32px 24px;overflow:auto;}
+  .menu-title{color:var(--ink);letter-spacing:3px;text-align:center;
+    font-size:26px;line-height:1.4;margin-top:8px;text-transform:uppercase;
+    text-shadow:1px 1px 0 rgba(255,255,255,.25);}
+  .menu-sub{color:var(--ink-soft);letter-spacing:2px;font-size:13px;
+    margin-top:10px;margin-bottom:22px;text-transform:uppercase;font-weight:normal;
+    font-family:'Arial',sans-serif;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,168px));
+    gap:18px;justify-content:center;max-width:1120px;width:100%;}
+  .card{background:#F2EBD8;border:1px solid rgba(94,75,58,.20);border-radius:10px;padding:12px 12px 10px;
+    box-shadow:0 6px 0 var(--panel-shadow), 0 8px 14px rgba(0,0,0,.18);
+    cursor:pointer;transition:transform .08s ease, box-shadow .08s ease;
+    display:flex;flex-direction:column;align-items:center;position:relative;}
+  .card:hover{transform:translateY(-3px);box-shadow:0 9px 0 var(--panel-shadow),0 12px 18px rgba(0,0,0,.22);}
+  .card:active{transform:translateY(2px);box-shadow:0 3px 0 var(--panel-shadow),0 5px 10px rgba(0,0,0,.2);}
+  .card h3{color:var(--ink);letter-spacing:2px;font-size:14px;margin-bottom:8px;
+    text-transform:uppercase;}
+  .card canvas{width:100%;height:96px;display:block;border-radius:6px;}
+  .card .stats{display:flex;gap:9px;align-items:center;margin-top:9px;
+    color:var(--ink);font-size:12px;font-family:'Arial',sans-serif;font-weight:bold;letter-spacing:.5px;}
+  .card .stats span{display:inline-flex;align-items:center;gap:2px;opacity:.92;}
+  .done-badge{position:absolute;top:8px;right:10px;color:#2C704B;font-size:15px;}
+
+  /* ---------- GAME ---------- */
+  #game{position:absolute;inset:0;background:#EAE1CB;display:none;}
+  #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+  .ui-btn{position:absolute;width:44px;height:44px;border-radius:9px;
+    background:var(--panel);box-shadow:0 4px 0 var(--panel-shadow);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    color:var(--cream);border:none;font-size:20px;user-select:none;}
+  .ui-btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--panel-shadow);}
+  #btnReset{left:18px;bottom:18px;}
+  #btnHome{left:70px;bottom:18px;}
+  #hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;
+    color:var(--ink-soft);font-family:'Arial',sans-serif;font-size:12px;
+    letter-spacing:1px;pointer-events:none;opacity:.8;}
+  #score{position:absolute;right:22px;bottom:16px;color:var(--ink);
+    text-align:center;font-size:15px;line-height:1.05;}
+  #score small{display:block;font-size:12px;opacity:.7;}
+  #conn{position:absolute;right:16px;top:14px;font-family:'Arial',sans-serif;
+    font-size:11px;letter-spacing:1px;color:var(--ink-soft);
+    background:rgba(0,0,0,.05);padding:4px 9px;border-radius:20px;}
+  #conn.on{color:#3f7d3f;}
+  #conn.off{color:#a45;}
+
+  /* overlay */
+  #overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(40,30,20,.35);}
+  #overlay .box{background:var(--tan);border-radius:14px;padding:30px 40px;text-align:center;
+    box-shadow:0 10px 0 var(--panel-shadow),0 14px 30px rgba(0,0,0,.3);}
+  #overlay h2{color:var(--ink);letter-spacing:3px;font-size:30px;text-transform:uppercase;}
+  #overlay p{color:var(--ink-soft);font-family:'Arial',sans-serif;margin-top:12px;font-size:15px;letter-spacing:1px;}
+  #overlay .obtn{margin-top:22px;display:inline-block;background:var(--panel);color:var(--cream);
+    padding:12px 26px;border-radius:9px;letter-spacing:2px;cursor:pointer;font-size:14px;
+    box-shadow:0 5px 0 var(--panel-shadow);text-transform:uppercase;}
+  #overlay .obtn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--panel-shadow);}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- MENU -->
+  <div id="menu">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game">
+    <canvas id="cv"></canvas>
+    <div id="conn" class="off">KEYS</div>
+    <button class="ui-btn" id="btnReset" title="重来">&#8635;</button>
+    <button class="ui-btn" id="btnHome" title="返回">&#8593;</button>
+    <div id="score">0<small>&#9733; 0</small></div>
+    <div id="hint">按住 空格 / 鼠标 = 用力 &nbsp;·&nbsp; 把力度稳在绿色窗口里</div>
+    <div id="overlay"><div class="box">
+      <h2 id="ovTitle">SENT!</h2>
+      <p id="ovText"></p>
+      <div class="obtn" id="ovBtn">路线列表</div>
+    </div></div>
+  </div>
+</div>
+
+<script src="mqtt.min.js"></script>
+<script>
+/* =====================================================================
+   FocusGrip  —  Klifur-style visual, custom "grip control" mechanics
+   Mechanics:  ① 力度窗口 (force window)  ② 持续保持点 (sustained hold)
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   INPUT LAYER  ——  这里是"缝合"硬件的唯一入口。
+   现在: 键盘/鼠标产生一个 0..1 的 grip 值。
+   以后: 硬件同学通过 WebSocket 发来 0..200 的压力值，
+         把 INPUT_MODE 改成 'network'、填好 WS_URL 即可，游戏逻辑一行都不用动。
+   注意: 浏览器收不了原始 TCP，只能收 WebSocket。
+         让 ESP32 直接开 WS，或用一个小桥接程序把 TCP(0-200) 转发成 WS。
+--------------------------------------------------------------------- */
+const INPUT_MODE = 'mqtt';              // 'keyboard' | 'network' | 'mqtt'
+const WS_URL     = 'ws://localhost:8080';
+const PRESSURE_MAX = 200;               // network 模式硬件压力值上限 → 归一化用
+// 巴法云 MQTT：压力传感器数据 "#压力#xx#off"，第一段为压力值 0..100
+const MQTT_URL   = 'wss://bemfa.com:9504/wss';
+const MQTT_UID   = '2f5766a44a754847861d3b5d1d4d9caf';
+const MQTT_TOPIC = 'press';
+const MQTT_PRESSURE_MAX = 100;          // 压力 0..100 → 握力 0..1（100 = 满格）
+
+const Input = (() => {
+  let raw = 0;              // 归一化后的力度 0..1（游戏只读这个）
+  let holding = false;      // 键盘模式下是否按住
+  let connected = false;
+  let mqttRaw = 0;          // 传感器最新压力（归一化 0..1）
+  const CHARGE = 0.62, RELEASE = 0.78;  // 键盘模式的充/泄速率（放慢=好控）
+
+  // 双输入并行：按住空格/鼠标 = 键盘接管（Plan B）；
+  // 松开且传感器在线 = 跟随传感器压力；都没有 = 自然泄力
+  function keyUpdate(dt){
+    if(INPUT_MODE==='network') return;
+    if(holding){
+      raw += CHARGE * dt;                      // 键盘主动时优先
+    }else if(INPUT_MODE==='mqtt' && connected){
+      raw += (mqttRaw - raw) * Math.min(1, dt*8);  // 平滑跟随传感器
+    }else{
+      raw -= RELEASE * dt;                     // 无输入：泄力
+    }
+    raw = Math.max(0, Math.min(1.15, raw));
+  }
+  function setHold(v){ holding = v; }
+
+  // 网络模式：收 0..200 → 归一化
+  function connectNetwork(){
+    if(INPUT_MODE!=='network') return;
+    try{
+      const ws = new WebSocket(WS_URL);
+      ws.onopen  = ()=>{ connected = true; };
+      ws.onclose = ()=>{ connected = false; setTimeout(connectNetwork, 1500); };
+      ws.onerror = ()=>{ connected = false; };
+      ws.onmessage = (e)=>{
+        // 容忍两种格式: 纯数字 "137"  或  JSON {"force":137}
+        let v = NaN;
+        try{ const j = JSON.parse(e.data); v = (typeof j==='number')?j:(j.force ?? j.pressure ?? j.value); }
+        catch(_){ v = parseFloat(e.data); }
+        if(!isNaN(v)) raw = Math.max(0, Math.min(1.25, v / PRESSURE_MAX));
+      };
+    }catch(_){ setTimeout(connectNetwork, 1500); }
+  }
+
+  // MQTT 模式：订阅巴法云主题，消息 "#36#78#off" → 取第一段 36 → raw=0.36
+  function connectMqtt(){
+    if(INPUT_MODE!=='mqtt') return;
+    if(typeof mqtt === 'undefined'){ setTimeout(connectMqtt, 1500); return; }
+    const c = mqtt.connect(MQTT_URL, {
+      clientId: MQTT_UID, clean: true,
+      connectTimeout: 5000, reconnectPeriod: 3000,
+    });
+    c.on('connect', ()=>{ c.subscribe(MQTT_TOPIC, {qos:0}); connected = true; });
+    c.on('close',   ()=>{ connected = false; });
+    c.on('error',   ()=>{ connected = false; });
+    c.on('message', (_t, payload)=>{
+      const parts = payload.toString().split('#').filter(Boolean);
+      const v = parseFloat(parts[0]);
+      if(!isNaN(v)) mqttRaw = Math.max(0, Math.min(1.15, v / MQTT_PRESSURE_MAX));
+    });
+  }
+
+  return {
+    get value(){ return raw; },
+    get connected(){ return connected; },
+    keyUpdate, setHold, connectNetwork, connectMqtt,
+    reset(){ raw = 0; holding = false; }
+  };
+})();
+
+/* ---------------------------------------------------------------------
+   COLORS  (sampled from Klifur)
+--------------------------------------------------------------------- */
+const HOLD_COLORS = {          // 逐像素取自参考图/视频
+  green:  '#2C704B',
+  green2: '#34724C',
+  orange: '#FEA509',
+  purple: '#7A38BE',
+  red:    '#A93554',
+  blue:   '#2E5EA6',
+};
+const HOLD_LIST = ['green','orange','blue','purple','green2','red'];
+
+/* ---------------------------------------------------------------------
+   LEVELS  ——  每关一条自下而上的攀岩线
+--------------------------------------------------------------------- */
+function rng(seed){ return ()=> (seed = (seed*1103515245+12345) & 0x7fffffff) / 0x7fffffff; }
+
+function makeLevel(name, count, seed, diff){
+  const r = rng(seed);
+  const holds = [];
+  let side = r()>.5?1:-1;
+  for(let k=0;k<count;k++){
+    const t = k/(count-1);
+    // 归一化坐标: nx 0..1 (水平), ny 0..1 (0=起点底部,1=顶点)
+    const nx = 0.5 + side*(0.14 + r()*0.16) * (0.5+0.5*Math.sin(k*1.3));
+    const ny = t;
+    const color = HOLD_LIST[Math.floor(r()*HOLD_LIST.length)];
+    // 前两点必是普通点(热身)，之后随机安排"持续保持点"
+    let type = 'normal';
+    if(k===count-1) type='top';
+    else if(k>=2 && r() < (0.16 + diff*0.12)) type='sustained';
+    // 每个点的力度窗口：中心 c、半宽 hw（越到后面越窄越高）
+    const c  = 0.40 + t*0.16 + diff*0.05 + (r()-0.5)*0.04;
+    const hw = 0.150 - t*0.022 - diff*0.014;
+    holds.push({ nx:Math.max(0.16,Math.min(0.84,nx)), ny, color, type,
+                 win:{ lo:c-hw, hi:c+hw } });
+    side *= -1;
+  }
+  const sustainedN = holds.filter(h=>h.type==='sustained').length;
+  return { name, count, diff, holds, sustainedN,
+           par: 2 + Math.round(count*1.6) };
+}
+
+// 第一关：8 个攀岩点，位置均衡、间距均匀且都在四肢可及范围内（人物弯曲攀爬、绝不拉伸）
+// nx 0=左 1=右; ny 0=底部起点 1=顶点; _t 形状: 0=blob 1=豆 2=三角 3=水滴 4=扁椭 5=环形; scale 缩放(小点)
+// 走向对齐参考图：左下一个小点起步，红→绿环→橙→橙→绿→蓝→紫(TOP)之字形上升
+function level1FromPicture(){
+  const P=[
+    {nx:0.30, ny:0.00, color:'red',    _t:3, _rot: 0.30, scale:0.66},  // 左下·小 红(起步)
+    {nx:0.62, ny:0.15, color:'red',    _t:2, _rot: 0.50},              // 右  红·三角
+    {nx:0.33, ny:0.30, color:'green',  _t:5, _rot: 0.00},              // 左  绿·环形(甜甜圈)
+    {nx:0.63, ny:0.44, color:'orange', _t:2, _rot: 0.55},              // 右  橙·三角
+    {nx:0.31, ny:0.58, color:'orange', _t:1, _rot:-0.20},              // 左  橙·豆形
+    {nx:0.60, ny:0.72, color:'green',  _t:0, _rot: 0.10},              // 右  绿
+    {nx:0.40, ny:0.86, color:'blue',   _t:0, _rot: 0.00},              // 中  蓝
+    {nx:0.30, ny:1.00, color:'purple', _t:1, _rot: 0.00},              // 顶  紫 TOP
+  ];
+  const holds=P.map((p,k)=>{
+    const ny=p.ny, c=0.42+ny*0.12, hw=0.150-ny*0.020;
+    return { nx:p.nx, ny, color:p.color, _t:p._t, _rot:p._rot, scale:p.scale||1,
+             type: k===P.length-1?'top':'normal',
+             win:{ lo:c-hw, hi:c+hw } };
+  });
+  return { name:'UPPHAF', count:holds.length, diff:0, holds, sustainedN:0,
+           authored:true, par: 2 + Math.round(holds.length*1.6) };
+}
+
+const LEVELS = [
+  level1FromPicture(),                 // 起点·最易（岩点 1:1 复刻图一）
+  makeLevel('KLETTUR', 7, 7401, 1),   // 岩石
+  makeLevel('VEGGUR',  8, 2258, 2),   // 墙
+  makeLevel('ÞRAUT',   9, 9182, 3),   // 难关
+  makeLevel('TINDUR',  10, 5566, 4),   // 顶峰
+  makeLevel('RISI',    12, 9137, 5),   // 巨人·终极（登顶之上的最难长线）
+];
+const progress = LEVELS.map(()=>({done:false, best:null}));
+
+/* ---------------------------------------------------------------------
+   MENU  render
+--------------------------------------------------------------------- */
+const grid = document.getElementById('grid');
+function buildMenu(){
+  grid.innerHTML='';
+  const sandURL='url('+sandCanvas().toDataURL()+')';   // 奶油沙砾噪点贴片（首页与卡片共用）
+  const menuEl=document.getElementById('menu');        // 首页背景：奶油底 + 粗糙沙砾噪点
+  menuEl.style.backgroundColor='#EAE1CB'; menuEl.style.backgroundImage=sandURL;
+  LEVELS.forEach((lv,i)=>{
+    const card = document.createElement('div');
+    card.className='card';
+    card.style.backgroundColor='#F2EBD8'; card.style.backgroundImage=sandURL;   // 关卡卡片同为米白粗糙噪点
+    card.innerHTML =
+      (progress[i].done?'<div class="done-badge">&#10004;</div>':'')+
+      `<h3>${lv.name}</h3>`+
+      `<canvas width="300" height="180"></canvas>`+
+      `<div class="stats">
+         <span>&#9829; ${lv.sustainedN}</span>
+         <span>&#9733; ${lv.count}</span>
+         <span>&#9201; 0:${String(lv.par).padStart(2,'0')}</span>
+       </div>`;
+    card.onclick = ()=> startLevel(i);
+    grid.appendChild(card);
+    drawPreview(card.querySelector('canvas'), lv);
+  });
+}
+function drawPreview(cv, lv){
+  const g = cv.getContext('2d'); const W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);
+  // 把归一化路线画成散点（对齐 Klifur 卡片风格）
+  const pad=26;
+  lv.holds.forEach((h,idx)=>{
+    const x = pad + h.nx*(W-2*pad);
+    const y = H-pad - h.ny*(H-2*pad);
+    const col = h.type==='top' ? '#7A38BE' : HOLD_COLORS[h.color];
+    const r = h.type==='top' ? 7 : 5.5;
+    // 手绘小岩点：固有色 + 深色描边 + 黑色小噪点
+    g.beginPath(); g.arc(x,y,r,0,7); g.fillStyle=col; g.fill();
+    g.lineWidth=1.6; g.strokeStyle='#241b12'; g.stroke();
+    let s=Math.floor(Math.abs((h.nx*31+h.ny*17+idx)*97))+5;
+    const rnd=()=>{ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; };
+    g.save(); g.beginPath(); g.arc(x,y,r,0,7); g.clip();
+    for(let i=0;i<4;i++){
+      const px=x+(rnd()*2-1)*r, py=y+(rnd()*2-1)*r, rr=0.5+rnd()*0.9;
+      g.fillStyle='rgba(25,18,10,'+(0.5+rnd()*0.4).toFixed(2)+')';
+      g.beginPath(); g.arc(px,py,rr,0,7); g.fill();
+    }
+    g.restore();
+  });
+}
+
+/* ---------------------------------------------------------------------
+   GAME state
+   坐标系：物理/世界统一为 y 向下为正（越往上爬 y 越小）
+--------------------------------------------------------------------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let CSSW=0, CSSH=0, DPR=1;
+
+const USE_FOOT_CHIPS = true;   // 生成脚点小岩块（只供踩脚，不参与判定）
+
+/* ===== 人体比例：以身高 BH=1 归一化，7.5 头身 ===== */
+const R = {
+  head:0.175, headW:0.165, neck:0.040,   // 适中圆头（对齐参考图一，不太大）
+  shoulderW:0.245, hipW:0.150, torso:0.288,
+  upperArm:0.186, foreArm:0.146, hand:0.108,
+  thigh:0.245, shin:0.246, foot:0.152
+};
+let BH=300, STEP=126;
+let TORSO,SW,HW,UPARM,FOARM,THIGH,SHIN,ARM_MAX,LEG_MAX,LEG_MIN,LEG_STAND,HOLDR;
+function deriveBody(){
+  TORSO = R.torso*BH; SW = R.shoulderW*BH; HW = R.hipW*BH;
+  UPARM = R.upperArm*BH; FOARM = R.foreArm*BH + R.hand*0.40*BH;
+  THIGH = R.thigh*BH;   SHIN  = R.shin*BH;
+  ARM_MAX = (UPARM+FOARM)*0.985;
+  LEG_MAX = (THIGH+SHIN)*0.985;
+  LEG_MIN = (THIGH+SHIN)*0.34;
+  LEG_STAND = LEG_MAX*0.90;   // 自然站立腿长：脚在髋下方时腿把身体撑到此长度(承重)
+  HOLDR   = 0.082*BH;   // 岩点尺寸：向参考图靠拢，更大更饱满
+}
+const GRAV = () => 9.8 * (BH/1.75);      // 身高按 1.75m 换算的重力
+
+/* ===== 身体：肩/髋两个 Verlet 质点 + 四肢长度约束 ===== */
+const B = {
+  S:{x:0,y:0,px:0,py:0},
+  P:{x:0,y:0,px:0,py:0},
+  LH:{tip:{x:0,y:0}, hold:null, side:-1, type:'hand'},
+  RH:{tip:{x:0,y:0}, hold:null, side: 1, type:'hand'},
+  LF:{tip:{x:0,y:0}, hold:null, side:-1, type:'foot'},
+  RF:{tip:{x:0,y:0}, hold:null, side: 1, type:'foot'}
+};
+let supKey='RH', leadKey='LH';
+
+function anchors(){
+  let dx=B.P.x-B.S.x, dy=B.P.y-B.S.y;
+  const d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d, nx=-uy, ny=ux;
+  return {
+    LH:{x:B.S.x+nx*SW*0.5, y:B.S.y+ny*SW*0.5},
+    RH:{x:B.S.x-nx*SW*0.5, y:B.S.y-ny*SW*0.5},
+    LF:{x:B.P.x+nx*HW*0.5, y:B.P.y+ny*HW*0.5},
+    RF:{x:B.P.x-nx*HW*0.5, y:B.P.y-ny*HW*0.5},
+    ux,uy,nx,ny
+  };
+}
+let STIFF=0.9;
+function solveOnce(){
+  let dx=B.P.x-B.S.x, dy=B.P.y-B.S.y;
+  const d=Math.hypot(dx,dy)||1, k=(d-TORSO)/d*0.5;
+  B.S.x+=dx*k; B.S.y+=dy*k; B.P.x-=dx*k; B.P.y-=dy*k;
+  const A=anchors();
+  for(const id of ['LH','RH','LF','RF']){
+    const L=B[id]; if(!L.hold) continue;
+    const a=A[id], bp = L.type==='hand'? B.S : B.P;
+    const max = L.type==='hand'? ARM_MAX : LEG_MAX;
+    let ax=L.hold.x-a.x, ay=L.hold.y-a.y, ad=Math.hypot(ax,ay)||1;
+    if(ad>max){ const f=(ad-max)/ad*STIFF; bp.x+=ax*f; bp.y+=ay*f; }
+    else if(L.type==='foot'){
+      if(ad<LEG_MIN){ const f=(ad-LEG_MIN)/ad*0.45; bp.x+=ax*f; bp.y+=ay*f; }        // 不许过度压缩
+      else if(ad<LEG_STAND && L.hold.y>a.y+2){                                       // 站立承重：脚在髋下方时，腿像真实下肢把身体“撑起”，而非纯悬挂在手上
+        const f=(ad-LEG_STAND)/ad*0.55; bp.x+=ax*f; bp.y+=ay*f;
+      }
+    }
+  }
+}
+function integrate(pt,dt,damp){
+  const vx=(pt.x-pt.px)*damp, vy=(pt.y-pt.py)*damp;
+  pt.px=pt.x; pt.py=pt.y;
+  pt.x+=vx; pt.y+=vy+GRAV()*dt*dt;
+}
+function stepBody(dt){
+  integrate(B.S,dt,0.93); integrate(B.P,dt,0.93);
+  STIFF=0.9;  for(let i=0;i<12;i++) solveOnce();
+  STIFF=1.0;  for(let i=0;i<4;i++)  solveOnce();   // 收尾：肢体不许被拉过解剖极限
+}
+function settle(n){ for(let i=0;i<n;i++) solveOnce(); B.S.px=B.S.x; B.S.py=B.S.y; B.P.px=B.P.x; B.P.py=B.P.y; }
+
+function clampLen(root,p,maxLen){
+  const dx=p.x-root.x, dy=p.y-root.y, d=Math.hypot(dx,dy);
+  if(d<=maxLen||d===0) return {x:p.x,y:p.y};
+  return {x:root.x+dx/d*maxLen, y:root.y+dy/d*maxLen};
+}
+
+/* ===== 踩脚点选择：脚必须真的踩在岩点上 ===== */
+function footCandidates(){
+  const g=G, out=[];
+  for(let k=0;k<=Math.min(g.i, g.holds.length-1);k++) out.push(g.holds[k]);
+  if(USE_FOOT_CHIPS) for(const c of g.chips) out.push(c);
+  return out;
+}
+function footScore(a, side, c){
+  // 理想踩点：贴近髋部（横向 0.17BH、下方 0.30BH）→ 腿保持自然弯曲，不再劈叉伸直
+  const ideal={x:a.x+side*0.17*BH, y:a.y+0.26*BH};
+  let s=Math.hypot(c.x-ideal.x, c.y-ideal.y);
+  if((c.x-a.x)*side < -0.10*BH) s += 0.40*BH;      // 别交叉到对侧
+  return s;
+}
+// 每帧维护：够不到就蹬脱，够得到就踩上去 —— 保证脚始终真的踩在岩点上
+const OTHER_FOOT = {LF:'RF', RF:'LF'};
+function manageFeet(force){
+  const A=anchors();
+  for(const key of ['LF','RF']){
+    const L=B[key], a=A[key];
+    const prev=L.hold;
+    if(L.hold){
+      const d=Math.hypot(L.hold.x-a.x, L.hold.y-a.y);
+      if(d>LEG_MAX*0.995 || d<LEG_MIN*0.55) L.hold=null;    // 蹬脱
+      else if(!force) continue;
+    }
+    const oh=B[OTHER_FOOT[key]].hold;
+    let best=null, bs=Infinity;
+    for(const c of footCandidates()){
+      const d=Math.hypot(c.x-a.x, c.y-a.y);
+      if(d>LEG_MAX*0.95 || d<LEG_MIN*0.9) continue;   // 靠下方彩色岩点略远也能踩稳(仍<腿长)，减少起步阶段悬空；footScore 仍优先近点
+      if(c.y < a.y - 0.55*BH) continue;                     // 允许高抬脚踩到髋部上方的彩色岩点(高踩/high-step)，仅受腿长限制；footScore 仍优先踩下方外侧的点
+      if(oh && Math.abs(oh.x-c.x)<1 && Math.abs(oh.y-c.y)<1) continue;   // 两只脚绝不踩同一个岩点
+      let s=footScore(a, L.side, c);
+      if(s<bs){ bs=s; best=c; }
+    }
+    if(best) L.hold={x:best.x, y:best.y};
+    else if(prev) L.hold=prev;   // 找不到替代点就保持原踩点，绝不让脚悬空
+  }
+}
+function pickFeet(){
+  B.LF.hold=null; B.RF.hold=null;
+  settle(26);
+  manageFeet(true);
+  settle(30);
+}
+
+/* ===== 关卡布局 ===== */
+function makeChips(pts, lv){
+  const r = rng(lv.holds.length*977 + 4211);
+  const chips=[];
+  // 支撑手踩在某主岩点时：髋大致在其正下方 hipDown 处
+  const hipDown = ARM_MAX*0.86 + TORSO;
+  const DOWN = hipDown + 0.26*BH;      // 主岩点 → 理想脚点(竖直)，与 footScore 一致
+  const SIDE = HW*0.5 + 0.17*BH;       // 中线 → 理想脚点(水平)
+  // 手工关卡(第一关)：不再生成任何辅助脚点 —— 画面只保留 8 个彩色岩点，脚直接踩在这些彩色岩点上
+  // 程序化关卡仍在每个主岩点下方放左右一对脚点，保证双脚有近点可踩、不悬空也不劈叉
+  const nChip = lv.authored ? 0 : (pts.length-1);
+  for(let k=0;k<nChip;k++){
+    const p=pts[k];
+    chips.push({ x:p.x - SIDE + (r()-0.5)*0.10*BH, y:p.y + DOWN + (r()-0.5)*0.08*BH });
+    chips.push({ x:p.x + SIDE + (r()-0.5)*0.10*BH, y:p.y + DOWN + (r()-0.5)*0.08*BH });
+  }
+  return chips;
+}
+function layoutLevel(){
+  const lv=G.lv;
+  BH   = Math.max(200, Math.min(CSSH*0.40, 340));
+  deriveBody();
+  // 纵向步距与横向铺开都收进真实臂展(ARM_MAX≈0.37BH)内 → 抓下一点时肢体保持弯曲，身体不被拉长
+  STEP = BH*0.30;
+  if(lv.authored){
+    // 手工绝对坐标（第一关）：nx 0..1 横向, ny 0..1 纵向(0=底 1=顶)
+    // 间距收进四肢可及范围：相邻岩点的距离 < 腿长，保证每次引体只是小幅位移、双脚不拉伸
+    const spread = Math.min(CSSW*0.58, BH*1.08);
+    // 纵向间距需 ≥ 身体“手到髆”长度，否则吊在支撑手下方时髆会落到低点下方、脚反而在髆上方→踩不稳
+    const VSPAN  = STEP*7.0;
+    G.holds = lv.holds.map((h,k)=>{
+      const x = CSSW*0.5 + (h.nx-0.5)*spread;
+      const y = -h.ny*VSPAN;
+      return Object.assign({}, h, { x, y });
+    });
+    G.chips = makeChips(G.holds, lv);
+    // 站立起步：人物一开始就双脚踩在最低两个彩色岩点上、身体立在其上方往上攀，
+    // 支撑手在第 4 点；因为身体跨约 3 个间距，支撑手需高于最低点 3 格、双脚才能落在髆下方作支撑
+    G.i = Math.min(3, G.holds.length-2);
+    G.lastGoodI = G.i;
+    resetBodyTo(G.i);
+    G.camY = (B.S.y+B.P.y)/2;
+    return;
+  }
+  const spread = Math.min(CSSW*0.42, BH*0.95);
+  let prevX = CSSW*0.5;
+  G.holds = lv.holds.map((h,k)=>{
+    let x = CSSW*0.5 + (h.nx-0.5)*spread;
+    if(k>0){ const dx=Math.max(-0.17*BH, Math.min(0.17*BH, x-prevX)); x = prevX+dx; }
+    prevX = x;
+    return Object.assign({}, h, { x, y: -k*STEP });   // y 向下为正 → 越高越负
+  });
+  G.chips = makeChips(G.holds, lv);
+  resetBodyTo(G.i);
+  G.camY = (B.S.y+B.P.y)/2;
+}
+function resetBodyTo(i){
+  const g=G, cur=g.holds[i], nxt=g.holds[i+1];
+  leadKey = (nxt && nxt.x < cur.x) ? 'LH' : 'RH';
+  supKey  = leadKey==='LH' ? 'RH' : 'LH';
+  B.S.x = cur.x; B.S.y = cur.y + ARM_MAX*0.86;
+  B.P.x = cur.x; B.P.y = B.S.y + TORSO;
+  B.S.px=B.S.x; B.S.py=B.S.y; B.P.px=B.P.x; B.P.py=B.P.y;
+  B[supKey].hold = {x:cur.x, y:cur.y};
+  B[leadKey].hold = null;
+  B[supKey].tip = {x:cur.x, y:cur.y};
+  B[leadKey].tip = {x:cur.x, y:cur.y};
+  pickFeet();
+  g.fill=0; g.reach=0; g.anim=0;
+}
+
+let G = null;
+function startLevel(idx){
+  document.getElementById('menu').style.display='none';
+  document.getElementById('game').style.display='block';
+  document.getElementById('overlay').style.display='none';
+  resize();
+  G = { idx, lv:LEVELS[idx], holds:[], chips:[],
+        i:0, fill:0, reach:0, camY:0, wreck:null, dirty:false,
+        anim:0, done:false, startT:performance.now(), lastGoodI:0,
+        grabs:0, cleanGrabs:0, bestHold:0, holdRun:0 };
+  layoutLevel();
+  Input.reset();
+  updateConn();
+}
+function updateConn(){
+  const el=document.getElementById('conn');
+  if(INPUT_MODE==='network'){ el.textContent = Input.connected?'LIVE':'…WS'; el.className = Input.connected?'on':'off'; }
+  else if(INPUT_MODE==='mqtt'){ el.textContent = Input.connected?'LIVE':'…MQTT'; el.className = Input.connected?'on':'off'; }
+  else { el.textContent='KEYS'; el.className='off'; }
+}
+
+/* ---------------------------------------------------------------------
+   MECHANICS  ——  力度窗口 / 持续保持 / 甩飞（沿用原设计）
+--------------------------------------------------------------------- */
+const RED_MARGIN = 0.19;
+function fillTimeFor(hold){ return hold.type==='sustained' ? 1.8 : 0.5; }
+
+function stepMechanics(dt){
+  const g=G;
+  if(g.done || g.wreck || g.anim>0) return;
+  const next=g.holds[g.i+1];
+  if(!next) return;
+  const f=Input.value, w=next.win, redLine=w.hi+RED_MARGIN, need=fillTimeFor(next);
+
+  g.reach = Math.max(0, Math.min(1, f/w.hi)) * 0.88;
+
+  if(f >= redLine){ triggerWreck(); return; }
+
+  if(f>=w.lo && f<=w.hi){
+    g.fill += dt;
+    g.holdRun += dt;
+    g.bestHold = Math.max(g.bestHold, g.holdRun);
+  } else {
+    if(f>w.hi) g.fill -= dt*1.1;
+    g.holdRun = 0;
+    if(f>w.hi || f<w.lo) g.dirty = true;
+  }
+  g.fill=Math.max(0,g.fill);
+
+  if(g.fill>=need){                      // 抓住
+    g.fill=0; g.anim=1e-6;
+    g.grabs++; if(!g.dirty) g.cleanGrabs++;
+    g.dirty=false; g.reach=1;
+    B[leadKey].hold = {x:next.x, y:next.y};   // 手真的落到岩点上
+    // 记录本次“引体上移”的起止身体位姿：动画阶段用缓动平滑过渡，
+    // 避免约束求解器在抓住瞬间一帧把躯干硬拽上去(之前~90px 的跳跃)
+    const toSx=next.x, toSy=next.y + ARM_MAX*0.86;
+    g.move = { fromSx:B.S.x, fromSy:B.S.y, fromPx:B.P.x, fromPy:B.P.y,
+               toSx, toSy, toPx:toSx, toPy:toSy + TORSO };
+  }
+}
+function triggerWreck(){
+  const g=G;
+  const cx=(B.S.x+B.P.x)/2, cy=(B.S.y+B.P.y)/2;
+  g.wreck = { x:cx, y:cy, vx:(Math.random()<.5?-1:1)*(190+Math.random()*130),
+              vy:-160, ang:0, va:(Math.random()<.5?-1:1)*(7+Math.random()*5), t:0 };
+  g.fill=0; g.dirty=false; g.holdRun=0;
+}
+
+/* ---------------------------------------------------------------------
+   UPDATE
+--------------------------------------------------------------------- */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.033,(now-last)/1000); last=now;
+  if(G && document.getElementById('game').style.display!=='none'){
+    Input.keyUpdate(dt);
+    update(dt);
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+function syncLead(){
+  const g=G, next=g.holds[g.i+1];
+  const L=B[leadKey];
+  if(L.hold){ L.tip.x=L.hold.x; L.tip.y=L.hold.y; return; }
+  const a=anchors()[leadKey];
+  const rest={x:a.x + L.side*0.13*BH, y:a.y + 0.30*BH};
+  const tgt = next ? next : rest;
+  const t=g.reach;
+  L.tip = clampLen(a, {x:rest.x+(tgt.x-rest.x)*t, y:rest.y+(tgt.y-rest.y)*t}, ARM_MAX*0.99);
+}
+function syncFreeLimbs(){
+  const A=anchors();
+  for(const id of ['LH','RH','LF','RF']){
+    const L=B[id];
+    if(L.hold){ L.tip.x=L.hold.x; L.tip.y=L.hold.y; continue; }
+    if(id===leadKey) continue;                       // 由 syncLead 处理
+    const a=A[id];
+    const reach=(L.type==='hand'?ARM_MAX:LEG_MAX)*0.80;
+    const tx=a.x + L.side*reach*0.30, ty=a.y + reach*0.86;
+    L.tip.x += (tx-L.tip.x)*0.14;
+    L.tip.y += (ty-L.tip.y)*0.14;
+    const c=clampLen(a,L.tip,reach*1.1); L.tip.x=c.x; L.tip.y=c.y;
+  }
+}
+
+function update(dt){
+  const g=G;
+  if(g.wreck){
+    const wk=g.wreck; wk.t+=dt;
+    wk.vy += 900*dt; wk.x+=wk.vx*dt; wk.y+=wk.vy*dt; wk.ang+=wk.va*dt;
+    if(wk.t>1.15){
+      g.wreck=null; g.i=g.lastGoodI;
+      resetBodyTo(g.i); Input.reset();
+    }
+  } else if(g.anim>0){
+    g.anim += dt*1.9;                       // 引体上移时长约 0.5s
+    const mv=g.move;
+    if(mv){
+      const t=Math.min(1,g.anim), e=t*t*(3-2*t);   // smoothstep：缓入缓出，躯干逐渐上移
+      B.S.x=mv.fromSx+(mv.toSx-mv.fromSx)*e; B.S.y=mv.fromSy+(mv.toSy-mv.fromSy)*e;
+      B.P.x=mv.fromPx+(mv.toPx-mv.fromPx)*e; B.P.y=mv.fromPy+(mv.toPy-mv.fromPy)*e;
+      B.S.px=B.S.x; B.S.py=B.S.y; B.P.px=B.P.x; B.P.py=B.P.y;   // 速度归零，不回弹
+    }
+    // 后半段松开旧支撑手 → 身体靠新点承重
+    if(g.anim>0.55) B[supKey].hold = null;
+    manageFeet(false);                       // 上移过程中脚自然换到更近的点
+    syncLead(); syncFreeLimbs();
+    if(g.anim>=1){
+      g.anim=0; g.i++; g.reach=0; g.lastGoodI=g.i;
+      const tk=supKey; supKey=leadKey; leadKey=tk;    // 交替手
+      B[leadKey].hold=null; g.move=null;
+      manageFeet(true);                      // 落定双脚（不做整体 settle，避免瞬移）
+      if(g.i>=g.holds.length-1){ winLevel(); }
+    }
+  } else {
+    stepMechanics(dt);
+    manageFeet(false);
+    syncLead(); syncFreeLimbs();
+    if(g.anim===0) stepBody(dt);   // 抓住瞬间不再跑整体求解，交给缓动阶段，避免一帧硬拽
+  }
+  const cy=(B.S.y+B.P.y)/2;
+  g.camY += ((g.wreck? g.wreck.y : cy) - g.camY)*Math.min(1,dt*4);
+  const sc=document.getElementById('score');
+  sc.innerHTML = `${g.i}<small>&#9733; ${g.holds.length-1}</small>`;
+  updateConn();
+}
+
+function winLevel(){
+  const g=G; g.done=true;
+  const secs=((performance.now()-g.startT)/1000);
+  const acc = g.grabs ? Math.round(g.cleanGrabs/g.grabs*100) : 100;
+  const p=progress[g.idx];
+  p.done=true; if(!p.best || secs<p.best) p.best=secs;
+  document.getElementById('ovTitle').textContent='SENT!';
+  document.getElementById('ovText').innerHTML =
+    `${g.lv.name} &nbsp;·&nbsp; 用时 ${secs.toFixed(1)}s<br>`+
+    `控制精度 ${acc}% &nbsp;·&nbsp; 最长稳定 ${g.bestHold.toFixed(1)}s`;
+  document.getElementById('overlay').style.display='flex';
+}
+
+/* ---------------------------------------------------------------------
+   RENDER
+--------------------------------------------------------------------- */
+function sy(y){ return CSSH*0.56 + (y - G.camY); }
+function scr(p){ return {x:p.x, y:sy(p.y)}; }
+
+function render(){
+  const g=G;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,CSSW,CSSH);
+  drawSandBG();
+  drawWall();
+
+  if(USE_FOOT_CHIPS) g.chips.forEach(c=>{
+    const y=sy(c.y); if(y<-40||y>CSSH+40) return;
+    drawChip(c.x,y,c);
+  });
+  g.holds.forEach((h,idx)=>{
+    const y=sy(h.y); if(y<-50||y>CSSH+50) return;
+    drawHold(h.x,y,h, idx===g.i+1);
+  });
+  const top=g.holds[g.holds.length-1];
+  drawTopMark(top.x, sy(top.y)-HOLDR*2.6);
+
+  if(g.wreck) drawWreck(); else drawClimber();
+  drawMeter();
+}
+
+// 奶油纸底 + 粗糙沙砾质感（对齐参考图一：偏米白 + 黑色细点点）
+let SANDCV=null, SAND=null;
+function sandCanvas(){          // 200×200 透明底沙砾噪点贴片（只含黑点，底色由各处自定）
+  if(SANDCV) return SANDCV;
+  const T=200, t=document.createElement('canvas'); t.width=T; t.height=T;
+  const c=t.getContext('2d');
+  let s=0x51ed7;
+  const rnd=()=>{ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; };
+  for(let i=0;i<160;i++){                 // 大小/深浅不一的黑色沙点
+    const x=rnd()*T, y=rnd()*T, r=0.3+rnd()*1.4;
+    c.fillStyle='rgba(38,29,18,'+(0.10+rnd()*0.38).toFixed(3)+')';
+    c.beginPath(); c.arc(x,y,r,0,7); c.fill();
+  }
+  for(let i=0;i<7;i++){                    // 少量细碎毛屑
+    const x=rnd()*T, y=rnd()*T, a=rnd()*7, len=2+rnd()*5;
+    c.strokeStyle='rgba(38,29,18,.28)'; c.lineWidth=0.7;
+    c.beginPath(); c.moveTo(x,y); c.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len); c.stroke();
+  }
+  SANDCV=t; return SANDCV;
+}
+function sandTile(){ if(!SAND) SAND=ctx.createPattern(sandCanvas(),'repeat'); return SAND; }
+function drawSandBG(){
+  ctx.fillStyle='#EAE1CB'; ctx.fillRect(0,0,CSSW,CSSH);
+  const off=G.camY*0.28;                   // 轻微视差，随攀爬滚动
+  ctx.save(); ctx.fillStyle=sandTile(); ctx.translate(0,off); ctx.fillRect(0,-off,CSSW,CSSH); ctx.restore();
+}
+
+// 墙面：淡淡的横向板缝，随镜头视差滚动（保持原有 tan 底色）
+function drawWall(){
+  ctx.save();
+  ctx.strokeStyle='rgba(94,75,58,.07)'; ctx.lineWidth=2;
+  const gap=STEP*1.6, off=(-G.camY*0.35)%gap;
+  for(let k=-1;k<Math.ceil(CSSH/gap)+2;k++){
+    const y=off+k*gap;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CSSW,y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const CHIP_COLORS=[HOLD_COLORS.green,HOLD_COLORS.orange,HOLD_COLORS.blue,HOLD_COLORS.red,HOLD_COLORS.green2];
+const CHIP_MUTED='#9C8A6E';   // 手工关卡：脚点用与沙底相近的暗棕、缩小并半透明，弱化存在感
+function drawChip(x,y,c){
+  if(c.ci===undefined){ const s=Math.abs(Math.round(x*7+y*13)); c.ci=s%CHIP_COLORS.length; c._t=(s>>2)%5; c._rot=((s%5)-2)*0.12; }
+  const authored = G && G.lv && G.lv.authored;
+  ctx.save(); ctx.translate(x,y);
+  if(authored){
+    ctx.globalAlpha=0.5;
+    paintHold(HOLDR*0.40, CHIP_MUTED, x, c._t, c._rot);
+    ctx.globalAlpha=1;
+  } else {
+    paintHold(HOLDR*0.82, CHIP_COLORS[c.ci], x, c._t, c._rot);
+  }
+  ctx.restore();
+}
+
+// 岩点造型库：对齐视频——每个岩点是不同的真实攀岩块，带深色描边与螺栓孔
+function holdShapePath(type, R, seed){
+  ctx.beginPath();
+  if(type===1){                 // 豆形 / 肾形
+    ctx.moveTo(-R*0.95,-R*0.10);
+    ctx.bezierCurveTo(-R*1.06,-R*0.95, R*1.06,-R*0.95, R*0.95,-R*0.05);
+    ctx.bezierCurveTo(R*0.80, R*0.45, R*0.32, R*0.18, 0, R*0.52);
+    ctx.bezierCurveTo(-R*0.32, R*0.84,-R*0.86, R*0.42,-R*0.95,-R*0.10);
+    ctx.closePath();
+  } else if(type===2){          // 圆角三角（尖朝上）
+    ctx.moveTo(0,-R*1.02);
+    ctx.quadraticCurveTo(R*0.60,-R*0.80, R*0.98, R*0.55);
+    ctx.quadraticCurveTo(R*1.04, R*0.92, R*0.52, R*0.88);
+    ctx.lineTo(-R*0.52, R*0.88);
+    ctx.quadraticCurveTo(-R*1.04, R*0.92,-R*0.98, R*0.55);
+    ctx.quadraticCurveTo(-R*0.60,-R*0.80, 0,-R*1.02);
+    ctx.closePath();
+  } else if(type===3){          // 水滴 / 逗号（带小尾巴）
+    ctx.moveTo(-R*0.15,-R*0.96);
+    ctx.bezierCurveTo(R*0.72,-R*0.96, R*0.98,-R*0.15, R*0.60, R*0.42);
+    ctx.bezierCurveTo(R*0.40, R*0.78, R*0.92, R*0.86, R*1.16, R*1.04);
+    ctx.bezierCurveTo(R*0.48, R*0.98,-R*0.18, R*0.96,-R*0.60, R*0.48);
+    ctx.bezierCurveTo(-R*1.02, R*0.02,-R*0.96,-R*0.92,-R*0.15,-R*0.96);
+    ctx.closePath();
+  } else if(type===4){          // 扁椭圆板
+    for(let ang=0;ang<Math.PI*2-1e-6;ang+=Math.PI/9){
+      const rr=R*(0.92+0.07*Math.sin(ang*3+seed));
+      const px=Math.cos(ang)*rr*1.16, py=Math.sin(ang)*rr*0.60;
+      ang===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+  } else if(type===5){          // 环形 / 甜甜圈（开放点）
+    ctx.moveTo(R*1.02,0); ctx.arc(0,0,R*1.02,0,Math.PI*2,false);   // 外圈
+    ctx.moveTo(R*0.46,0); ctx.arc(0,0,R*0.46,0,Math.PI*2,true);    // 内圈(反向挖空)
+  } else {                      // 0：圆润 blob
+    for(let ang=0;ang<Math.PI*2-1e-6;ang+=Math.PI/7){
+      const rr=R*(0.86+0.15*Math.sin(ang*2+seed));
+      const px=Math.cos(ang)*rr, py=Math.sin(ang)*rr*0.92;
+      ang===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+  }
+}
+function paintHold(R, col, seed, type, rot){
+  ctx.save();
+  if(rot) ctx.rotate(rot);
+  // 柔和投影（岩点下方淡淡影子）
+  ctx.save(); ctx.translate(R*0.14, R*0.30);
+  holdShapePath(type, R*1.02, seed);
+  ctx.fillStyle='rgba(45,35,22,.18)'; ctx.fill('evenodd');
+  ctx.restore();
+  // 主体填色
+  holdShapePath(type, R, seed);
+  ctx.fillStyle=col; ctx.fill('evenodd');
+  // 黑色点点点：裁剪在岩点内部，密集散布（对齐参考图手绘岩点）
+  ctx.save();
+  holdShapePath(type, R, seed); ctx.clip('evenodd');
+  let s=Math.floor(Math.abs(seed*97))+7;
+  const rnd=()=>{ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; };
+  const n=Math.round(R*0.95)+6;
+  for(let i=0;i<n;i++){
+    const px=(rnd()*2-1)*R*1.15, py=(rnd()*2-1)*R*1.05, rr=R*(0.03+rnd()*0.065);
+    ctx.fillStyle='rgba(25,18,10,'+(0.45+rnd()*0.42).toFixed(3)+')';
+    ctx.beginPath(); ctx.arc(px,py,rr,0,7); ctx.fill();
+  }
+  ctx.restore();
+  // 手绘深色描边
+  holdShapePath(type, R, seed);
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.strokeStyle='#241b12'; ctx.lineWidth=Math.max(2.2, R*0.13); ctx.stroke();
+  // 螺栓孔：小圆环（环形点本身已是开放孔，跳过）
+  if(type!==5){
+    ctx.strokeStyle='rgba(30,22,14,.7)'; ctx.lineWidth=Math.max(1.4, R*0.05);
+    ctx.beginPath(); ctx.ellipse(R*0.04, R*0.04, R*0.13, R*0.10, 0, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawHold(x,y,h,isTarget){
+  const col = (h.type==='top') ? HOLD_COLORS.purple : (HOLD_COLORS[h.color] || '#888');
+  const HR = HOLDR*(h.scale||1);
+  if(h._t===undefined){ const s=Math.abs(Math.round(x*13+y*7)); h._t=s%5; h._rot=((s%7)-3)*0.09; }
+  ctx.save(); ctx.translate(x,y);
+  paintHold(HR, col, h.nx*7, h._t, h._rot);
+  if(h.type==='sustained'){
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(0,0,HR+7,0,7); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+
+  if(isTarget && !G.wreck && G.anim===0){
+    const need=fillTimeFor(h), p=Math.max(0,Math.min(1,G.fill/need)), rr=HR+11;
+    ctx.strokeStyle='rgba(90,70,50,.5)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.stroke();
+    ctx.strokeStyle= h.type==='sustained'? '#A93554':'#2C704B'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(x,y,rr,-Math.PI/2,-Math.PI/2+p*Math.PI*2); ctx.stroke();
+  }
+}
+
+function drawTopMark(x,y){
+  const cols=['#A93554','#FEA509','#7A38BE','#2C704B','#FEA509','#A93554'];
+  ctx.save(); ctx.translate(x,y);
+  cols.forEach((c,i)=>{ ctx.fillStyle=c; ctx.save();
+    ctx.rotate((i-2.5)*0.16); ctx.fillRect(-2.5,-30,5,16); ctx.restore(); });
+  ctx.fillStyle='#7A38BE'; ctx.beginPath(); ctx.arc(0,2,7,0,7); ctx.fill();
+  ctx.restore();
+}
+
+// 二节肢体反向运动学
+function ik(root,end,l1,l2,bend){
+  let dx=end.x-root.x, dy=end.y-root.y;
+  let d=Math.hypot(dx,dy)||0.0001;
+  const ux=dx/d, uy=dy/d;
+  d=Math.max(Math.abs(l1-l2)+0.01, Math.min(l1+l2-0.01, d));
+  const a=(l1*l1-l2*l2+d*d)/(2*d);
+  const h=Math.sqrt(Math.max(0,l1*l1-a*a));
+  return { joint:{x:root.x+ux*a+(-uy)*h*bend, y:root.y+uy*a+(ux)*h*bend},
+           end:{x:root.x+ux*d, y:root.y+uy*d} };
+}
+
+/* ===== 角色绘制：造型对齐参考图 ===== */
+// 逐像素取自参考图；扁平风，无描边
+const SKIN     = '#B5865A';   // 头、手臂、腿（参考图为同一肤色）
+const SKIN_LEG = '#B5865A';
+const SHIRT    = '#B45573';   // 玫粉上衣
+const SHORT    = '#252839';   // 深藏青短裤
+const SHOE     = '#2A2829';   // 攀岩鞋
+const SHOW_FACE = false;      // 参考图为背面视角，无五官；想要眼睛改成 true
+
+function strokePair(a,b,w,col){
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle=col; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+}
+const lerpP=(a,b,t)=>({x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t});
+
+// 平滑锥形肢体：沿法线偏移的梯形 + 各关节处的圆端盖做并集
+// → 肩/肘/膝以及与躯干的接缝都连续平滑，不再出现宽度断层
+function segQuad(a,b,ra,rb){
+  let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+  const nx=-dy/d, ny=dx/d;
+  ctx.beginPath();
+  ctx.moveTo(a.x+nx*ra, a.y+ny*ra);
+  ctx.lineTo(b.x+nx*rb, b.y+ny*rb);
+  ctx.lineTo(b.x-nx*rb, b.y-ny*rb);
+  ctx.lineTo(a.x-nx*ra, a.y-ny*ra);
+  ctx.closePath(); ctx.fill();
+}
+function capDot(p,r){ ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill(); }
+// 一根两节肢体（根→关节→端），半宽从 r0→r1→r2 逐渐收窄
+function limbTaper(p0,p1,p2,r0,r1,r2,col){
+  ctx.fillStyle=col;
+  segQuad(p0,p1,r0,r1);
+  segQuad(p1,p2,r1,r2);
+  capDot(p0,r0); capDot(p1,r1); capDot(p2,r2);   // 圆盖填补关节处，消除断层
+}
+
+/* --- 鞋 --- */
+// 外八：鞋尖朝身体外侧；腿越向外张，鞋尖压得越低
+function shoeAngle(hipA, tip, side){
+  const dx=(tip.x-hipA.x)*side, dy=Math.max(1, tip.y-hipA.y);
+  return Math.max(0.02, Math.min(0.85, 0.24 + Math.atan2(dx,dy)*0.30));
+}
+// 鞋的局部坐标 → 屏幕偏移（含左脚镜像）
+function shoeLocal(lx,ly,a,side){
+  const X = side<0 ? -lx : lx, th = side>0 ? a : -a;
+  return {x:X*Math.cos(th)-ly*Math.sin(th), y:X*Math.sin(th)+ly*Math.cos(th)};
+}
+const SHOE_T = () => 0.058*BH;
+// contact = 岩点接触点；鞋底压在它上面（参考图里鞋是踩在岩点上表面的）
+function drawShoe(contact, a, side){
+  const L=R.foot*BH, T=SHOE_T();
+  ctx.save();
+  ctx.translate(contact.x, contact.y);
+  ctx.rotate(side>0 ? a : -a);
+  if(side<0) ctx.scale(-1,1);
+  ctx.beginPath();
+  ctx.moveTo(-L*0.30,-T*0.92);
+  ctx.quadraticCurveTo(-L*0.47,-T*0.36, -L*0.33, 0);        // 鞋跟
+  ctx.lineTo(L*0.46, 0);                                    // 鞋底（压在岩点上）
+  ctx.quadraticCurveTo(L*0.81,-T*0.06, L*0.73,-T*0.50);     // 鞋尖
+  ctx.quadraticCurveTo(L*0.57,-T*1.00, L*0.06,-T*0.98);     // 鞋面
+  ctx.closePath();
+  ctx.fillStyle=SHOE; ctx.fill();
+  ctx.restore();
+}
+
+/* --- 整个人 --- */
+// pose:{S,P,tips:{LH,RH,LF,RF}} 物理空间；gaze 只在 SHOW_FACE 时用
+function drawFigure(pose, rot, gaze){
+  const S0=scr(pose.S), P0=scr(pose.P);
+  const dx=P0.x-S0.x, dy=P0.y-S0.y;
+  const d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d, nx=-uy, ny=ux;
+  const A={
+    LH:{x:S0.x+nx*SW*0.5, y:S0.y+ny*SW*0.5},
+    RH:{x:S0.x-nx*SW*0.5, y:S0.y-ny*SW*0.5},
+    LF:{x:P0.x+nx*HW*0.5, y:P0.y+ny*HW*0.5},
+    RF:{x:P0.x-nx*HW*0.5, y:P0.y-ny*HW*0.5}
+  };
+  const T={LH:scr(pose.tips.LH),RH:scr(pose.tips.RH),LF:scr(pose.tips.LF),RF:scr(pose.tips.RF)};
+
+  ctx.save();
+  if(rot){ ctx.translate((S0.x+P0.x)/2,(S0.y+P0.y)/2); ctx.rotate(rot);
+           ctx.translate(-(S0.x+P0.x)/2,-(S0.y+P0.y)/2); }
+
+  // ① 腿 + 鞋（最后面）
+  const knees={};
+  for(const id of ['LF','RF']){
+    const side=B[id].side;
+    const tip=clampLen(A[id], T[id], LEG_MAX*0.995);   // 腿永不超解剖极限：瞬态时鞋随腿端而非悬空拉伸
+    const a=shoeAngle(A[id],tip,side);
+    // 踝关节在接触点斜上方 → 鞋底才会正好压在岩点上
+    const off=shoeLocal(-R.foot*BH*0.10, -SHOE_T()*0.95, a, side);
+    const ankle={x:tip.x+off.x, y:tip.y+off.y};
+    const k=ik(A[id],ankle,THIGH,SHIN,-side);
+    knees[id]=k;
+    limbTaper(A[id], k.joint, k.end, 0.040*BH, 0.030*BH, 0.022*BH, SKIN_LEG);
+    drawShoe(tip,a,side);
+  }
+
+  // ② 躯干：肩宽 → 腰 → 髋宽，圆润轮廓
+  const sL={x:S0.x+nx*SW*0.46,y:S0.y+ny*SW*0.46}, sR={x:S0.x-nx*SW*0.46,y:S0.y-ny*SW*0.46};
+  const wL={x:S0.x+ux*TORSO*0.58+nx*SW*0.34, y:S0.y+uy*TORSO*0.58+ny*SW*0.34};
+  const wR={x:S0.x+ux*TORSO*0.58-nx*SW*0.34, y:S0.y+uy*TORSO*0.58-ny*SW*0.34};
+  const hL={x:P0.x+ux*TORSO*0.12+nx*HW*0.78, y:P0.y+uy*TORSO*0.12+ny*HW*0.78};
+  const hR={x:P0.x+ux*TORSO*0.12-nx*HW*0.78, y:P0.y+uy*TORSO*0.12-ny*HW*0.78};
+  const mid={x:(hL.x+hR.x)/2+ux*0.04*BH, y:(hL.y+hR.y)/2+uy*0.04*BH};
+
+  ctx.beginPath();                       // 上衣
+  ctx.moveTo(sL.x,sL.y);
+  ctx.quadraticCurveTo(S0.x-ux*0.03*BH, S0.y-uy*0.03*BH, sR.x,sR.y);
+  ctx.quadraticCurveTo(wR.x-nx*0.02*BH, wR.y-ny*0.02*BH, wR.x,wR.y);
+  ctx.lineTo(hR.x,hR.y);
+  ctx.quadraticCurveTo(mid.x,mid.y,hL.x,hL.y);
+  ctx.lineTo(wL.x,wL.y);
+  ctx.quadraticCurveTo(wL.x+nx*0.02*BH, wL.y+ny*0.02*BH, sL.x,sL.y);
+  ctx.closePath();
+  ctx.fillStyle=SHIRT; ctx.fill();
+
+  ctx.beginPath();                       // 短裤
+  ctx.moveTo(wL.x,wL.y); ctx.lineTo(wR.x,wR.y);
+  ctx.lineTo(hR.x,hR.y);
+  ctx.quadraticCurveTo(mid.x,mid.y,hL.x,hL.y);
+  ctx.closePath();
+  ctx.fillStyle=SHORT; ctx.fill();
+  for(const id of ['LF','RF']){          // 裤腿盖住大腿根（锥形与躯干平滑相接）
+    const k=knees[id];
+    const sm=lerpP(A[id],k.joint,0.42);
+    ctx.fillStyle=SHORT;
+    segQuad(A[id], sm, 0.052*BH, 0.040*BH);
+    capDot(A[id],0.052*BH); capDot(sm,0.040*BH);
+  }
+
+  // ③ 脖子 + 头（参考图为背面视角，默认无五官）
+  const hx=S0.x-ux*(R.neck+R.head*0.46)*BH, hy=S0.y-uy*(R.neck+R.head*0.46)*BH;
+  ctx.fillStyle=SKIN;
+  segQuad(S0,{x:hx,y:hy},0.048*BH,0.050*BH); capDot(S0,0.048*BH);   // 脖子：与肘、头都平滑过渡
+  const th=Math.atan2(uy,ux)-Math.PI/2;
+  const hrx=R.headW*0.5*BH, hry=R.head*0.5*BH;
+  ctx.save(); ctx.translate(hx,hy); ctx.rotate(th);
+  ctx.beginPath(); ctx.ellipse(0,0,hrx,hry,0,0,7);
+  ctx.fillStyle=SKIN; ctx.fill();
+  if(SHOW_FACE && gaze){
+    const gp=scr(gaze), gwx=gp.x-hx, gwy=gp.y-hy, gl=Math.hypot(gwx,gwy)||1;
+    const cs=Math.cos(th), sn=Math.sin(th);
+    const lx=( gwx*cs+gwy*sn)/gl, ly=(-gwx*sn+gwy*cs)/gl;
+    const eo=hrx*0.46, ey=hry*0.06, pr=hrx*0.13;
+    ctx.fillStyle='#fafafa';
+    ctx.beginPath(); ctx.arc(-eo,ey,hrx*0.27,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc( eo,ey,hrx*0.27,0,7); ctx.fill();
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath(); ctx.arc(-eo+lx*pr, ey+ly*pr, pr,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc( eo+lx*pr, ey+ly*pr, pr,0,7); ctx.fill();
+  }
+  ctx.restore();
+
+  // ④ 手臂（最前）+ 袖口
+  for(const id of ['LH','RH']){
+    const side=B[id].side;
+    const k=ik(A[id],T[id],UPARM,FOARM,side);
+    limbTaper(A[id], k.joint, k.end, 0.030*BH, 0.024*BH, 0.019*BH, SKIN);
+    capDot(k.end, 0.026*BH);                       // 手/拳
+    const sm=lerpP(A[id],k.joint,0.34);            // 短袖：盖住上臂根，与躯干平滑相接
+    ctx.fillStyle=SHIRT;
+    segQuad(A[id], sm, 0.040*BH, 0.032*BH);
+    capDot(A[id],0.040*BH); capDot(sm,0.032*BH);
+  }
+  ctx.restore();
+}
+
+function drawClimber(){
+  drawFigure({S:B.S,P:B.P,tips:{LH:B.LH.tip,RH:B.RH.tip,LF:B.LF.tip,RF:B.RF.tip}},
+             0, B[leadKey].tip);
+}
+function drawWreck(){
+  const wk=G.wreck, cx=wk.x, cy=wk.y, T=TORSO/2;
+  const S0={x:cx,y:cy-T}, P0={x:cx,y:cy+T};
+  const pose={ S:S0, P:P0, tips:{
+    LH:{x:cx-ARM_MAX*0.80, y:cy-T-ARM_MAX*0.45},
+    RH:{x:cx+ARM_MAX*0.86, y:cy-T-ARM_MAX*0.30},
+    LF:{x:cx-LEG_MAX*0.72, y:cy+T+LEG_MAX*0.60},
+    RF:{x:cx+LEG_MAX*0.78, y:cy+T+LEG_MAX*0.48}
+  }};
+  drawFigure(pose, wk.ang, pose.tips.RH);
+}
+
+// 力度计（右侧竖条）
+function drawMeter(){
+  const g=G;
+  const next=g.holds[g.i+1];
+  const mx=CSSW-46, my=CSSH*0.5, mh=CSSH*0.5, mw=16;
+  const top=my-mh/2, bot=my+mh/2;
+  const F = v => bot - Math.min(1,v/1.25)*mh;
+  round(mx-mw/2, top, mw, mh, 8, 'rgba(90,72,52,.18)');
+  if(next){
+    const w=next.win, redLine=w.hi+RED_MARGIN;
+    round(mx-mw/2, F(redLine), mw, F(w.hi)-F(redLine), 0, 'rgba(224,149,46,.5)');
+    round(mx-mw/2, F(w.hi), mw, F(w.lo)-F(w.hi), 0,
+      next.type==='sustained'? 'rgba(169,53,84,.60)':'rgba(44,112,75,.62)');
+    ctx.strokeStyle='#9C3B4D'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(mx-mw/2-3,F(redLine)); ctx.lineTo(mx+mw/2+3,F(redLine)); ctx.stroke();
+  }
+  const fy=F(Input.value);
+  ctx.fillStyle='#5E4B3A';
+  ctx.beginPath();
+  ctx.moveTo(mx-mw/2-10,fy); ctx.lineTo(mx-mw/2-2,fy-6); ctx.lineTo(mx-mw/2-2,fy+6);
+  ctx.closePath(); ctx.fill();
+  round(mx-mw/2, fy-2, mw, 4, 0, 'rgba(94,75,58,.9)');
+  function round(x,y,w,h,r,fill){ if(h<=0){return;} ctx.fillStyle=fill;
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.fill(); }
+}
+
+/* ---------------------------------------------------------------------
+   INPUT wiring
+--------------------------------------------------------------------- */
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); Input.setHold(true); }
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='Space'){ e.preventDefault(); Input.setHold(false); }
+});
+cv.addEventListener('pointerdown', e=>{ Input.setHold(true); });
+window.addEventListener('pointerup', ()=> Input.setHold(false));
+
+document.getElementById('btnReset').onclick = ()=> startLevel(G.idx);
+document.getElementById('btnHome').onclick  = goMenu;
+document.getElementById('ovBtn').onclick    = goMenu;
+function goMenu(){
+  document.getElementById('game').style.display='none';
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('menu').style.display='flex';
+  buildMenu();
+  G=null;
+}
+
+/* ---------------------------------------------------------------------
+   RESIZE + boot
+--------------------------------------------------------------------- */
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  CSSW = cv.clientWidth; CSSH = cv.clientHeight;
+  cv.width = CSSW*DPR; cv.height = CSSH*DPR;
+}
+window.addEventListener('resize', ()=>{ if(G){ resize(); layoutLevel(); } });
+
+buildMenu();
+if(INPUT_MODE==='network') Input.connectNetwork();
+if(INPUT_MODE==='mqtt') Input.connectMqtt();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
